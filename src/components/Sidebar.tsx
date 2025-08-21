@@ -7,7 +7,8 @@ import {
   ChevronRight, 
   LayoutDashboard, 
   FileText,
-  Building2
+  Building2,
+  GitBranch
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,12 @@ export const Sidebar = () => {
       icon: FileText,
       path: "/",
       isActive: location.pathname === "/" || location.pathname.startsWith("/claim/")
+    },
+    {
+      title: "Claim Pipelines",
+      icon: GitBranch,
+      path: "/claims/pipelines",
+      isActive: location.pathname === "/claims/pipelines"
     }
   ];
 
@@ -68,7 +75,7 @@ export const Sidebar = () => {
       {/* Navigation Menu */}
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-2">
-          {menuItems.map((item) => {
+          {menuItems.map((item, index) => {
             const Icon = item.icon;
             return (
               <Button

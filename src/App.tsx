@@ -7,6 +7,7 @@ import { Layout } from "./components/Layout";
 import { ClaimsList } from "./components/ClaimsList";
 import { ClaimDetail } from "./components/ClaimDetail";
 import { Dashboard } from "./components/Dashboard";
+import { ClaimPipelinePage } from "./components/pipeline/ClaimPipelinePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<ClaimsList />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/claims/pipelines" element={<ClaimPipelinePage />} />
             <Route path="/claim/:id" element={<ClaimDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
