@@ -8,7 +8,8 @@ import {
   LayoutDashboard, 
   FileText,
   Building2,
-  GitBranch
+  GitBranch,
+  FlaskConical
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,12 @@ export const Sidebar = () => {
       icon: GitBranch,
       path: "/claims/pipelines",
       isActive: location.pathname === "/claims/pipelines"
+    },
+    {
+      title: "Working Demo",
+      icon: FlaskConical,
+      path: "/working-demo",
+      isActive: location.pathname === "/working-demo"
     }
   ];
 

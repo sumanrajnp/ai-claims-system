@@ -8,6 +8,7 @@ import { ClaimsList } from "./components/ClaimsList";
 import { ClaimDetail } from "./components/ClaimDetail";
 import { Dashboard } from "./components/Dashboard";
 import { ClaimPipelinePage } from "./components/pipeline/ClaimPipelinePage";
+import { WorkingDemoPage } from "./components/WorkingDemoPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
             <Route path="/" element={<ClaimsList />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/claims/pipelines" element={<ClaimPipelinePage />} />
+            <Route path="/working-demo" element={<WorkingDemoPage />} />
             <Route path="/claim/:id" element={<ClaimDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
