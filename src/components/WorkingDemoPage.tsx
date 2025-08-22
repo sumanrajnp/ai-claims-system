@@ -16,7 +16,9 @@ import {
   CheckCircle, 
   User, 
   CreditCard,
-  XCircle
+  XCircle,
+  X,
+  Eye
 } from "lucide-react";
 
 interface ProcessedClaim {
@@ -42,17 +44,52 @@ interface ProcessedClaim {
   }>;
 }
 
+interface FileUpload {
+  prescription: File[];
+  hospitalBills: File[];
+  medicineBills: File[];
+  labBills: File[];
+}
+
+interface UploadStatus {
+  prescription: 'pending' | 'uploading' | 'success' | 'error';
+  hospitalBills: 'pending' | 'uploading' | 'success' | 'error';
+  medicineBills: 'pending' | 'uploading' | 'success' | 'error';
+  labBills: 'pending' | 'uploading' | 'success' | 'error';
+}
+
 export const WorkingDemoPage = () => {
   const [formData, setFormData] = useState({
     fromEmail: "",
     subject: "",
     body: ""
   });
-  const [attachments, setAttachments] = useState<File[]>([]);
+  
+  const [fileUploads, setFileUploads] = useState<FileUpload>({
+    prescription: [],
+    hospitalBills: [],
+    medicineBills: [],
+    labBills: []
+  });
+
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
+    prescription: 'pending',
+    hospitalBills: 'pending',
+    medicineBills: 'pending',
+    labBills: 'pending'
+  });
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedClaim, setProcessedClaim] = useState<ProcessedClaim | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+
+  const fileInputRefs = {
+    prescription: useRef<HTMLInputElement>(null),
+    hospitalBills: useRef<HTMLInputElement>(null),
+    medicineBills: useRef<HTMLInputElement>(null),
+    labBills: useRef<HTMLInputElement>(null)
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -62,10 +99,51 @@ export const WorkingDemoPage = () => {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (category: keyof FileUpload, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      setAttachments(filesArray);
+      setFileUploads(prev => ({
+        ...prev,
+        [category]: [...prev[category], ...filesArray]
+      }));
+    }
+  };
+
+  const removeFile = (category: keyof FileUpload, index: number) => {
+    setFileUploads(prev => ({
+      ...prev,
+      [category]: prev[category].filter((_, i) => i !== index)
+    }));
+  };
+
+  const uploadFiles = async (category: keyof FileUpload, files: File[]): Promise<boolean> => {
+    if (files.length === 0) return true;
+
+    setUploadStatus(prev => ({ ...prev, [category]: 'uploading' }));
+    
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+        formData.append('category', category);
+      });
+
+      // Simulate API call to /upload endpoint
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        setUploadStatus(prev => ({ ...prev, [category]: 'success' }));
+        return true;
+      } else {
+        setUploadStatus(prev => ({ ...prev, [category]: 'error' }));
+        return false;
+      }
+    } catch (error) {
+      setUploadStatus(prev => ({ ...prev, [category]: 'error' }));
+      return false;
     }
   };
 
@@ -76,22 +154,35 @@ export const WorkingDemoPage = () => {
     setProcessedClaim(null);
 
     try {
-      // Simulate API call with 2-second delay
+      // Upload all files first
+      const uploadResults = await Promise.all([
+        uploadFiles('prescription', fileUploads.prescription),
+        uploadFiles('hospitalBills', fileUploads.hospitalBills),
+        uploadFiles('medicineBills', fileUploads.medicineBills),
+        uploadFiles('labBills', fileUploads.labBills)
+      ]);
+
+      // Check if all uploads were successful
+      if (uploadResults.some(result => !result)) {
+        throw new Error("Some file uploads failed. Please try again.");
+      }
+
+      // Simulate AI processing with 2-second delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Simulate AI processing based on form data and attachments
-      const simulatedClaim = simulateAIProcessing(formData, attachments);
+      // Simulate AI processing based on form data and uploaded files
+      const simulatedClaim = simulateAIProcessing(formData, fileUploads);
       setProcessedClaim(simulatedClaim);
     } catch (err) {
-      setError("Failed to process claim. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to process claim. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const simulateAIProcessing = (data: any, files: File[]): ProcessedClaim => {
-    // Extract some information from filenames to make it feel realistic
-    const extractedData = extractDataFromFilenames(files);
+  const simulateAIProcessing = (data: any, files: FileUpload): ProcessedClaim => {
+    // Extract information from uploaded files to make it feel realistic
+    const extractedData = extractDataFromFiles(files);
     
     return {
       status: "processed",
@@ -109,29 +200,53 @@ export const WorkingDemoPage = () => {
         },
         total: 0
       },
-      attachments: files.map(file => ({
-        name: file.name,
-        url: URL.createObjectURL(file),
-        type: file.type
-      }))
+      attachments: [
+        ...files.prescription.map(file => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          type: file.type
+        })),
+        ...files.hospitalBills.map(file => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          type: file.type
+        })),
+        ...files.medicineBills.map(file => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          type: file.type
+        })),
+        ...files.labBills.map(file => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+          type: file.type
+        }))
+      ]
     };
   };
 
-  const extractDataFromFilenames = (files: File[]) => {
+  const extractDataFromFiles = (files: FileUpload) => {
     const data: any = {};
     
-    files.forEach(file => {
-      const filename = file.name.toLowerCase();
-      if (filename.includes('medicine') || filename.includes('pharmacy')) {
-        data.medicines = Math.floor(Math.random() * 5000) + 1000;
-      } else if (filename.includes('lab') || filename.includes('test')) {
-        data.labs = Math.floor(Math.random() * 8000) + 2000;
-      } else if (filename.includes('opd') || filename.includes('consultation')) {
-        data.opd = Math.floor(Math.random() * 3000) + 500;
-      } else if (filename.includes('other') || filename.includes('misc')) {
-        data.others = Math.floor(Math.random() * 2000) + 500;
-      }
-    });
+    // Extract data from medicine bills
+    if (files.medicineBills.length > 0) {
+      data.medicines = Math.floor(Math.random() * 5000) + 1000;
+    }
+    
+    // Extract data from lab bills
+    if (files.labBills.length > 0) {
+      data.labs = Math.floor(Math.random() * 8000) + 2000;
+    }
+    
+    // Extract data from hospital bills (OPD)
+    if (files.hospitalBills.length > 0) {
+      data.opd = Math.floor(Math.random() * 3000) + 500;
+    }
+    
+    // Extract data from prescription (others)
+    if (files.prescription.length > 0) {
+      data.others = Math.floor(Math.random() * 2000) + 500;
+    }
     
     return data;
   };
@@ -169,14 +284,58 @@ export const WorkingDemoPage = () => {
     return Object.values(categories).reduce((sum: number, value: any) => sum + (Number(value) || 0), 0);
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <div className="w-4 h-4 rounded-full bg-gray-300" />;
+      case 'uploading':
+        return <Loader2 className="w-4 h-4 animate-spin text-blue-600" />;
+      case 'success':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'error':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      default:
+        return <div className="w-4 h-4 rounded-full bg-gray-300" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'uploading':
+        return 'Uploading...';
+      case 'success':
+        return 'Uploaded';
+      case 'error':
+        return 'Failed';
+      default:
+        return 'Pending';
+    }
+  };
+
   const resetForm = () => {
     setFormData({ fromEmail: "", subject: "", body: "" });
-    setAttachments([]);
+    setFileUploads({
+      prescription: [],
+      hospitalBills: [],
+      medicineBills: [],
+      labBills: []
+    });
+    setUploadStatus({
+      prescription: 'pending',
+      hospitalBills: 'pending',
+      medicineBills: 'pending',
+      labBills: 'pending'
+    });
     setProcessedClaim(null);
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setUploadProgress({});
+    
+    // Clear all file inputs
+    Object.values(fileInputRefs).forEach(ref => {
+      if (ref.current) ref.current.value = '';
+    });
   };
 
   return (
@@ -243,43 +402,198 @@ export const WorkingDemoPage = () => {
                 />
               </div>
 
-              {/* Attachments */}
-              <div className="space-y-2">
-                <Label htmlFor="attachments">Attachments (Invoices)</Label>
-                <Input
-                  id="attachments"
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".jpg,.jpeg,.png,.pdf"
-                  onChange={handleFileChange}
-                  className="cursor-pointer"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Supported formats: JPG, PNG, PDF (Multiple files allowed)
-                </p>
-              </div>
-
-              {/* File Preview */}
-              {attachments.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Selected Files:</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {attachments.map((file, index) => {
-                      const Icon = getFileIcon(file.type);
-                      return (
-                        <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{file.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({(file.size / 1024).toFixed(1)} KB)
-                          </span>
-                        </div>
-                      );
-                    })}
+              {/* File Upload Sections */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold">Document Uploads</h3>
+                
+                {/* Prescription */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="prescription">Prescription</Label>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(uploadStatus.prescription)}
+                      <span className="text-sm text-muted-foreground">
+                        {getStatusText(uploadStatus.prescription)}
+                      </span>
+                    </div>
                   </div>
+                  <Input
+                    id="prescription"
+                    ref={fileInputRefs.prescription}
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => handleFileChange('prescription', e)}
+                    className="cursor-pointer"
+                  />
+                  {fileUploads.prescription.length > 0 && (
+                    <div className="space-y-2">
+                      {fileUploads.prescription.map((file, index) => {
+                        const Icon = getFileIcon(file.type);
+                        return (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                            <Icon className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm flex-1">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile('prescription', index)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Hospital Bills */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="hospitalBills">Hospital/Doctor Bills</Label>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(uploadStatus.hospitalBills)}
+                      <span className="text-sm text-muted-foreground">
+                        {getStatusText(uploadStatus.hospitalBills)}
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    id="hospitalBills"
+                    ref={fileInputRefs.hospitalBills}
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => handleFileChange('hospitalBills', e)}
+                    className="cursor-pointer"
+                  />
+                  {fileUploads.hospitalBills.length > 0 && (
+                    <div className="space-y-2">
+                      {fileUploads.hospitalBills.map((file, index) => {
+                        const Icon = getFileIcon(file.type);
+                        return (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                            <Icon className="h-4 w-4 text-green-600" />
+                            <span className="text-sm flex-1">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile('hospitalBills', index)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Medicine Bills */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="medicineBills">Medicine Bills</Label>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(uploadStatus.medicineBills)}
+                      <span className="text-sm text-muted-foreground">
+                        {getStatusText(uploadStatus.medicineBills)}
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    id="medicineBills"
+                    ref={fileInputRefs.medicineBills}
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => handleFileChange('medicineBills', e)}
+                    className="cursor-pointer"
+                  />
+                  {fileUploads.medicineBills.length > 0 && (
+                    <div className="space-y-2">
+                      {fileUploads.medicineBills.map((file, index) => {
+                        const Icon = getFileIcon(file.type);
+                        return (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg">
+                            <Icon className="h-4 w-4 text-yellow-600" />
+                            <span className="text-sm flex-1">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile('medicineBills', index)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lab Bills */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="labBills">Lab Bills</Label>
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(uploadStatus.labBills)}
+                      <span className="text-sm text-muted-foreground">
+                        {getStatusText(uploadStatus.labBills)}
+                      </span>
+                    </div>
+                  </div>
+                  <Input
+                    id="labBills"
+                    ref={fileInputRefs.labBills}
+                    type="file"
+                    multiple
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => handleFileChange('labBills', e)}
+                    className="cursor-pointer"
+                  />
+                  {fileUploads.labBills.length > 0 && (
+                    <div className="space-y-2">
+                      {fileUploads.labBills.map((file, index) => {
+                        const Icon = getFileIcon(file.type);
+                        return (
+                          <div key={index} className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg">
+                            <Icon className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm flex-1">{file.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({(file.size / 1024).toFixed(1)} KB)
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile('labBills', index)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Submit Button */}
               <Button 
@@ -421,7 +735,7 @@ export const WorkingDemoPage = () => {
                   <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg">
                     <span className="text-lg font-semibold">Total Amount</span>
                     <span className="text-2xl font-bold text-foreground">
-                      {formatCurrency(calculateTotal(processedClaim.structuredData.categories) || 0)}
+                      {formatCurrency(calculateTotal(processedClaim.structuredData.categories))}
                     </span>
                   </div>
                 </div>
