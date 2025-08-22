@@ -9,7 +9,8 @@ import {
   FileText,
   Building2,
   GitBranch,
-  FlaskConical
+  FlaskConical,
+  Network
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,12 @@ export const Sidebar = () => {
       icon: FlaskConical,
       path: "/working-demo",
       isActive: location.pathname === "/working-demo"
+    },
+    {
+      title: "System Flow",
+      icon: Network,
+      path: "/system-flow",
+      isActive: location.pathname === "/system-flow"
     }
   ];
 
